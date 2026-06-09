@@ -1,0 +1,790 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Test VMA</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0d0f14;
+    --surface: #161a24;
+    --surface2: #1e2433;
+    --green: #00e676;
+    --green-dim: #00b359;
+    --orange: #ff6d2d;
+    --red: #ff3b5c;
+    --blue: #3d8bff;
+    --text: #f0f2f8;
+    --text-dim: #7a8099;
+    --border: rgba(255,255,255,0.07);
+    --radius: 16px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Outfit', sans-serif;
+    height: 100dvh;
+    width: 100vw;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ── HEADER ── */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 18px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  header h1 {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 2rem;
+    letter-spacing: 3px;
+    color: var(--green);
+    line-height: 1;
+  }
+  header .subtitle {
+    font-size: 0.72rem;
+    color: var(--text-dim);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+  .header-right {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 3px;
+  }
+  #elapsed-label {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.5rem;
+    letter-spacing: 2px;
+    color: var(--text-dim);
+    transition: color 0.3s;
+  }
+  #elapsed-label.active { color: var(--orange); }
+
+  /* ── MAIN LAYOUT ── */
+  main {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 33.33% 1fr;
+    gap: 0;
+    overflow: hidden;
+  }
+
+  /* ── LEFT: CHRONOS ── */
+  .chrono-panel {
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 14px 10px;
+    position: relative;
+  }
+
+  .phase-badge {
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    padding: 4px 12px;
+    border-radius: 99px;
+    font-weight: 600;
+    transition: all 0.4s;
+    background: var(--surface2);
+    color: var(--text-dim);
+  }
+  .phase-badge.run { background: rgba(0,230,118,0.15); color: var(--green); }
+  .phase-badge.rest { background: rgba(255,109,45,0.15); color: var(--orange); }
+
+  .big-timer {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: clamp(4rem, 10vw, 6rem);
+    line-height: 1;
+    letter-spacing: 4px;
+    transition: color 0.4s;
+    color: var(--text-dim);
+    text-align: center;
+  }
+  .big-timer.run { color: var(--green); text-shadow: 0 0 40px rgba(0,230,118,0.3); }
+  .big-timer.rest { color: var(--orange); text-shadow: 0 0 40px rgba(255,109,45,0.3); }
+
+  /* Progress arc */
+  .arc-wrap {
+    position: relative;
+    width: min(120px, 18vw);
+    height: min(120px, 18vw);
+  }
+  .arc-wrap svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+  .arc-bg { fill: none; stroke: var(--surface2); stroke-width: 7; }
+  .arc-fg {
+    fill: none;
+    stroke-width: 7;
+    stroke-linecap: round;
+    transition: stroke-dashoffset 0.9s linear, stroke 0.4s;
+  }
+  .arc-text {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.6rem;
+    letter-spacing: 2px;
+  }
+
+  .minute-dots {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    background: var(--surface2);
+    border: 1.5px solid rgba(255,255,255,0.1);
+    transition: all 0.3s;
+  }
+  .dot.done { background: var(--green); border-color: var(--green); box-shadow: 0 0 6px var(--green-dim); }
+  .dot.current { background: var(--orange); border-color: var(--orange); animation: pulse-dot 0.8s infinite alternate; }
+  @keyframes pulse-dot { from { opacity:0.6; transform:scale(0.9); } to { opacity:1; transform:scale(1.2); } }
+
+  #minute-label {
+    font-size: 0.7rem;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+  }
+
+  /* ── RIGHT: CONTROLS ── */
+  .controls-panel {
+    display: flex;
+    flex-direction: column;
+    padding: 12px 16px;
+    gap: 10px;
+    overflow-y: auto;
+  }
+
+  /* Course rows */
+  .courses-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 6px;
+  }
+  .course-cell {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 6px 4px;
+    gap: 2px;
+    min-height: 54px;
+  }
+  .course-cell.active { border-color: var(--orange); background: rgba(255,109,45,0.08); }
+  .course-cell.done { border-color: var(--green-dim); }
+  .course-num {
+    font-size: 0.6rem;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+  .course-plots {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.5rem;
+    line-height: 1;
+    color: var(--text);
+    transition: color 0.2s;
+  }
+  .course-cell.active .course-plots { color: var(--orange); }
+  .course-cell.done .course-plots { color: var(--green); }
+
+  /* Plot counter big */
+  .counter-row {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    gap: 8px;
+    align-items: center;
+  }
+  .btn-plot {
+    border: none;
+    cursor: pointer;
+    border-radius: 14px;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 2.5rem;
+    line-height: 1;
+    transition: all 0.12s;
+    padding: 12px;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  .btn-plot:active { transform: scale(0.93); }
+  #btn-add {
+    background: var(--green);
+    color: #000;
+    box-shadow: 0 4px 20px rgba(0,230,118,0.25);
+  }
+  #btn-add:disabled { background: var(--surface2); color: var(--text-dim); box-shadow: none; cursor: not-allowed; }
+  #btn-remove {
+    background: var(--surface2);
+    color: var(--text-dim);
+    border: 1px solid var(--border);
+  }
+  #btn-remove:disabled { cursor: not-allowed; opacity: 0.4; }
+
+  .counter-display {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background: var(--surface2);
+    border-radius: 14px;
+    padding: 10px 8px;
+    border: 1px solid var(--border);
+  }
+  .counter-display .val {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: clamp(2.2rem, 6vw, 3.5rem);
+    line-height: 1;
+    color: var(--text);
+  }
+  .counter-display .lbl {
+    font-size: 0.6rem;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    text-align: center;
+  }
+
+  /* Start / reset buttons */
+  .action-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  .btn-action {
+    border: none;
+    cursor: pointer;
+    border-radius: 14px;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.4rem;
+    letter-spacing: 2px;
+    padding: 14px;
+    transition: all 0.15s;
+  }
+  .btn-action:active { transform: scale(0.96); }
+  #btn-start {
+    background: var(--blue);
+    color: #fff;
+    grid-column: 1 / -1;
+    box-shadow: 0 4px 24px rgba(61,139,255,0.3);
+  }
+  #btn-start.started { background: var(--red); box-shadow: 0 4px 24px rgba(255,59,92,0.3); }
+  #btn-reset {
+    background: var(--surface2);
+    color: var(--text-dim);
+    border: 1px solid var(--border);
+    font-size: 1rem;
+    grid-column: 1 / -1;
+    display: none;
+  }
+
+  /* ── RESULT OVERLAY ── */
+  #result-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.85);
+    z-index: 100;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 18px;
+    backdrop-filter: blur(8px);
+    padding: 20px;
+  }
+  #result-overlay.show { display: flex; }
+  .result-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 24px;
+    padding: 32px 40px;
+    max-width: 500px;
+    width: 100%;
+    text-align: center;
+    position: relative;
+  }
+  .result-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.1rem;
+    letter-spacing: 4px;
+    color: var(--text-dim);
+    margin-bottom: 8px;
+  }
+  .result-vma {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: clamp(4rem, 16vw, 6rem);
+    line-height: 1;
+    color: var(--green);
+    text-shadow: 0 0 60px rgba(0,230,118,0.5);
+  }
+  .result-unit {
+    font-size: 1rem;
+    color: var(--text-dim);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 20px;
+  }
+  .result-detail {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 6px;
+    margin-top: 16px;
+  }
+  .result-mini {
+    background: var(--surface2);
+    border-radius: 8px;
+    padding: 6px 4px;
+    font-size: 0.65rem;
+    color: var(--text-dim);
+  }
+  .result-mini span {
+    display: block;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.1rem;
+    color: var(--green);
+    letter-spacing: 1px;
+  }
+  #btn-close-result {
+    background: var(--green);
+    color: #000;
+    border: none;
+    border-radius: 14px;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.4rem;
+    letter-spacing: 2px;
+    padding: 14px 40px;
+    cursor: pointer;
+  }
+
+  /* Flash animation for bip */
+  @keyframes flash-green { 0%,100%{background:var(--surface)} 50%{background:rgba(0,230,118,0.15)} }
+  @keyframes flash-orange { 0%,100%{background:var(--surface)} 50%{background:rgba(255,109,45,0.15)} }
+  .chrono-panel.flash-run { animation: flash-green 0.25s ease; }
+  .chrono-panel.flash-rest { animation: flash-orange 0.25s ease; }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>Test VMA</h1>
+    <div class="subtitle">36&Prime; course · 24&Prime; pause · plots / 10m</div>
+  </div>
+  <div class="header-right">
+    <div id="elapsed-label">0:00</div>
+    <div class="subtitle">durée du test</div>
+  </div>
+</header>
+
+<main>
+  <!-- ── CHRONO PANEL ── -->
+  <div class="chrono-panel" id="chrono-panel">
+    <div class="phase-badge" id="phase-badge">EN ATTENTE</div>
+
+    <div class="arc-wrap">
+      <svg viewBox="0 0 120 120">
+        <circle class="arc-bg" cx="60" cy="60" r="52"/>
+        <circle class="arc-fg" id="arc-fg" cx="60" cy="60" r="52"
+          stroke="var(--green)"
+          stroke-dasharray="326.7"
+          stroke-dashoffset="326.7"/>
+      </svg>
+      <div class="arc-text" id="arc-text">--</div>
+    </div>
+
+    <div class="big-timer" id="big-timer">--</div>
+
+    <div id="minute-label">MINUTE 0 / 10</div>
+
+    <div class="minute-dots" id="minute-dots">
+      <!-- 10 dots generated by JS -->
+    </div>
+  </div>
+
+  <!-- ── CONTROLS PANEL ── -->
+  <div class="controls-panel">
+
+    <!-- Courses grid -->
+    <div class="courses-grid" id="courses-grid">
+      <!-- 10 cells generated by JS -->
+    </div>
+
+    <!-- Counter -->
+    <div class="counter-row">
+      <button class="btn-plot" id="btn-remove" disabled>−</button>
+      <div class="counter-display">
+        <div class="val" id="current-plots">0</div>
+        <div class="lbl">Plots franchis<br>cette minute</div>
+      </div>
+      <button class="btn-plot" id="btn-add" disabled>+</button>
+    </div>
+
+    <!-- Actions -->
+    <div class="action-row">
+      <button class="btn-action" id="btn-start">▶ DÉMARRER LE TEST</button>
+      <button class="btn-action" id="btn-reset">↺ RÉINITIALISER</button>
+    </div>
+
+  </div>
+</main>
+
+<!-- ── RESULT OVERLAY ── -->
+<div id="result-overlay">
+  <div class="result-card">
+    <div class="result-title">RÉSULTAT DU TEST VMA</div>
+    <div class="result-vma" id="result-vma-val">0</div>
+    <div class="result-unit">plots/min en moyenne — Vitesse Maximale Aérobie</div>
+    <div class="result-detail" id="result-detail"></div>
+  </div>
+  <button id="btn-close-result">VOIR LE RÉCAPITULATIF</button>
+</div>
+
+<script>
+// ── AudioContext for beeps ──
+let audioCtx = null;
+function getAudio() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  return audioCtx;
+}
+function beep(freq = 880, dur = 0.12, vol = 1.0, delay = 0) {
+  const ctx = getAudio();
+  const t = ctx.currentTime + delay;
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.connect(gain); gain.connect(ctx.destination);
+  osc.type = 'square';
+  osc.frequency.value = freq;
+  gain.gain.setValueAtTime(vol, t);
+  gain.gain.exponentialRampToValueAtTime(0.001, t + dur);
+  osc.start(t); osc.stop(t + dur + 0.01);
+}
+function threeBeeps(type) {
+  // 3 beeps spaced 200ms
+  const freq = type === 'run' ? 1320 : 880;
+  for (let i = 0; i < 3; i++) beep(freq, 0.15, 1.0, i * 0.22);
+}
+
+// ── State ──
+const TOTAL_MINUTES = 10;
+const RUN_SEC = 36;
+const REST_SEC = 24;
+const CYCLE_SEC = RUN_SEC + REST_SEC; // 60s
+
+let running = false;
+let minuteData = new Array(TOTAL_MINUTES).fill(null); // plots per minute
+let currentMinute = 0; // 0-indexed
+let currentPlotsThisMinute = 0;
+
+let masterTimer = null;      // interval for seconds tick
+let elapsedTotal = 0;        // seconds elapsed in test (0..600)
+let phaseElapsed = 0;        // seconds in current phase
+
+// ── DOM refs ──
+const elElapsed = document.getElementById('elapsed-label');
+const elPhaseBadge = document.getElementById('phase-badge');
+const elBigTimer = document.getElementById('big-timer');
+const elArcFg = document.getElementById('arc-fg');
+const elArcText = document.getElementById('arc-text');
+const elMinuteLabel = document.getElementById('minute-label');
+const elDots = document.getElementById('minute-dots');
+const elCoursesGrid = document.getElementById('courses-grid');
+const elCurrentPlots = document.getElementById('current-plots');
+const elBtnAdd = document.getElementById('btn-add');
+const elBtnRemove = document.getElementById('btn-remove');
+const elBtnStart = document.getElementById('btn-start');
+const elBtnReset = document.getElementById('btn-reset');
+const elChronoPanel = document.getElementById('chrono-panel');
+const elResultOverlay = document.getElementById('result-overlay');
+const elResultVma = document.getElementById('result-vma-val');
+const elResultDetail = document.getElementById('result-detail');
+
+// ── Build static UI ──
+function buildDots() {
+  elDots.innerHTML = '';
+  for (let i = 0; i < TOTAL_MINUTES; i++) {
+    const d = document.createElement('div');
+    d.className = 'dot';
+    d.id = `dot-${i}`;
+    elDots.appendChild(d);
+  }
+}
+function buildCourses() {
+  elCoursesGrid.innerHTML = '';
+  for (let i = 0; i < TOTAL_MINUTES; i++) {
+    const cell = document.createElement('div');
+    cell.className = 'course-cell';
+    cell.id = `cell-${i}`;
+    cell.innerHTML = `<div class="course-num">Course ${i+1}</div><div class="course-plots" id="cell-val-${i}">—</div>`;
+    elCoursesGrid.appendChild(cell);
+  }
+}
+buildDots();
+buildCourses();
+
+// ── Arc helper ──
+const ARC_CIRCUM = 2 * Math.PI * 52; // ~326.73
+function setArc(ratio, colorVar) {
+  elArcFg.style.stroke = colorVar;
+  elArcFg.style.strokeDashoffset = ARC_CIRCUM * (1 - ratio);
+}
+
+// ── Phase: which phase are we in given elapsedTotal ──
+// Within each minute: 0..35 = RUN, 36..59 = REST
+function getPhaseInfo(elapsed) {
+  const minute = Math.floor(elapsed / CYCLE_SEC); // 0..9
+  const withinMin = elapsed % CYCLE_SEC;
+  const isRun = withinMin < RUN_SEC;
+  const phaseRemaining = isRun ? (RUN_SEC - withinMin) : (CYCLE_SEC - withinMin);
+  const phaseTotal = isRun ? RUN_SEC : REST_SEC;
+  return { minute, withinMin, isRun, phaseRemaining, phaseTotal };
+}
+
+// ── Update UI each tick ──
+function updateUI() {
+  const { minute, withinMin, isRun, phaseRemaining, phaseTotal } = getPhaseInfo(elapsedTotal);
+
+  // Elapsed label
+  const eMin = Math.floor(elapsedTotal / 60);
+  const eSec = elapsedTotal % 60;
+  elElapsed.textContent = `${eMin}:${String(eSec).padStart(2,'0')}`;
+  elElapsed.classList.add('active');
+
+  // Big timer
+  elBigTimer.textContent = String(phaseRemaining).padStart(2,'0');
+  elBigTimer.className = `big-timer ${isRun ? 'run' : 'rest'}`;
+
+  // Phase badge
+  elPhaseBadge.textContent = isRun ? '🏃 COURSE' : '⏸ RÉCUPÉRATION';
+  elPhaseBadge.className = `phase-badge ${isRun ? 'run' : 'rest'}`;
+
+  // Arc
+  const ratio = (phaseTotal - phaseRemaining) / phaseTotal;
+  setArc(ratio, isRun ? 'var(--green)' : 'var(--orange)');
+  elArcText.textContent = phaseRemaining;
+  elArcText.style.color = isRun ? 'var(--green)' : 'var(--orange)';
+
+  // Minute label & dots
+  elMinuteLabel.textContent = `MINUTE ${minute+1} / ${TOTAL_MINUTES}`;
+  for (let i = 0; i < TOTAL_MINUTES; i++) {
+    const d = document.getElementById(`dot-${i}`);
+    if (i < minute) { d.className = 'dot done'; }
+    else if (i === minute) { d.className = 'dot current'; }
+    else { d.className = 'dot'; }
+  }
+
+  // Course cells
+  for (let i = 0; i < TOTAL_MINUTES; i++) {
+    const cell = document.getElementById(`cell-${i}`);
+    const val = document.getElementById(`cell-val-${i}`);
+    if (minuteData[i] !== null) {
+      cell.className = 'course-cell done';
+      val.textContent = minuteData[i];
+    } else if (i === minute) {
+      cell.className = 'course-cell active';
+      val.textContent = currentPlotsThisMinute;
+    } else {
+      cell.className = 'course-cell';
+      val.textContent = '—';
+    }
+  }
+
+  // Current plots counter
+  elCurrentPlots.textContent = currentPlotsThisMinute;
+  elBtnAdd.disabled = !isRun; // Can only add plots during run phase
+  elBtnRemove.disabled = currentPlotsThisMinute <= 0 || !isRun;
+}
+
+// ── Beep triggers ──
+// Called when withinMin crosses 0 (start of run) or RUN_SEC (start of rest)
+function onRunStart() {
+  threeBeeps('run');
+  flashPanel('run');
+}
+function onRestStart() {
+  threeBeeps('rest');
+  flashPanel('rest');
+  // Save plots for completed run
+  minuteData[currentMinute] = currentPlotsThisMinute;
+  document.getElementById(`cell-val-${currentMinute}`).textContent = currentPlotsThisMinute;
+  currentMinute++;
+  currentPlotsThisMinute = 0;
+}
+function flashPanel(type) {
+  elChronoPanel.classList.remove('flash-run','flash-rest');
+  void elChronoPanel.offsetWidth;
+  elChronoPanel.classList.add(`flash-${type}`);
+  setTimeout(() => elChronoPanel.classList.remove(`flash-${type}`), 300);
+}
+
+// ── Tick function (called every second) ──
+function tick() {
+  elapsedTotal++;
+
+  if (elapsedTotal > TOTAL_MINUTES * CYCLE_SEC) {
+    endTest();
+    return;
+  }
+
+  const withinMin = elapsedTotal % CYCLE_SEC;
+
+  // Transitions
+  if (withinMin === 0) {
+    // Start of new minute run
+    onRunStart();
+  } else if (withinMin === RUN_SEC) {
+    // Start of rest
+    onRestStart();
+  }
+
+  updateUI();
+
+  if (elapsedTotal >= TOTAL_MINUTES * CYCLE_SEC) {
+    endTest();
+  }
+}
+
+// ── Start test ──
+elBtnStart.addEventListener('click', () => {
+  getAudio(); // unlock audio on user gesture
+  if (running) {
+    stopTest();
+    return;
+  }
+  startTest();
+});
+
+function startTest() {
+  running = true;
+  elBtnStart.textContent = '■ ARRÊTER LE TEST';
+  elBtnStart.classList.add('started');
+  elBtnReset.style.display = 'none';
+
+  // Immediate: start is "minute 1 run start"
+  onRunStart();
+  updateUI();
+
+  masterTimer = setInterval(tick, 1000);
+}
+
+function stopTest() {
+  clearInterval(masterTimer);
+  running = false;
+  elBtnStart.textContent = '▶ DÉMARRER LE TEST';
+  elBtnStart.classList.remove('started');
+  elBtnReset.style.display = 'block';
+  elBtnAdd.disabled = true;
+  elBtnRemove.disabled = true;
+}
+
+// ── End test ──
+function endTest() {
+  stopTest();
+  // Save last minute if needed
+  if (minuteData[currentMinute] === null && currentMinute < TOTAL_MINUTES) {
+    minuteData[currentMinute] = currentPlotsThisMinute;
+  }
+
+  // VMA = moyenne simple des plots franchis par minute
+  const validData = minuteData.filter(v => v !== null);
+  const avg = validData.reduce((a,b) => a+b, 0) / validData.length;
+  const vma = avg.toFixed(1);
+
+  // Show result
+  elResultVma.textContent = vma;
+
+  // Detail
+  elResultDetail.innerHTML = '';
+  validData.forEach((v, i) => {
+    const div = document.createElement('div');
+    div.className = 'result-mini';
+    div.innerHTML = `<span>${v}</span>C${i+1}`;
+    elResultDetail.appendChild(div);
+  });
+
+  elResultOverlay.classList.add('show');
+}
+
+// ── Reset ──
+elBtnReset.addEventListener('click', () => {
+  minuteData = new Array(TOTAL_MINUTES).fill(null);
+  currentMinute = 0;
+  currentPlotsThisMinute = 0;
+  elapsedTotal = 0;
+  elBtnReset.style.display = 'none';
+  elBtnStart.textContent = '▶ DÉMARRER LE TEST';
+  elBtnStart.classList.remove('started');
+  elElapsed.textContent = '0:00';
+  elElapsed.classList.remove('active');
+  elBigTimer.textContent = '--';
+  elBigTimer.className = 'big-timer';
+  elPhaseBadge.textContent = 'EN ATTENTE';
+  elPhaseBadge.className = 'phase-badge';
+  elArcFg.style.strokeDashoffset = ARC_CIRCUM;
+  elArcText.textContent = '--';
+  elCurrentPlots.textContent = '0';
+  elBtnAdd.disabled = true;
+  elBtnRemove.disabled = true;
+  elMinuteLabel.textContent = 'MINUTE 0 / 10';
+  buildDots();
+  buildCourses();
+  elResultOverlay.classList.remove('show');
+});
+
+// ── Close result overlay ──
+document.getElementById('btn-close-result').addEventListener('click', () => {
+  elResultOverlay.classList.remove('show');
+});
+
+// ── Plot buttons ──
+elBtnAdd.addEventListener('click', () => {
+  currentPlotsThisMinute++;
+  elCurrentPlots.textContent = currentPlotsThisMinute;
+  elBtnRemove.disabled = false;
+  // Flash counter
+  elCurrentPlots.style.color = 'var(--green)';
+  setTimeout(() => elCurrentPlots.style.color = '', 200);
+  // Update active cell
+  const cell = document.getElementById(`cell-val-${currentMinute}`);
+  if (cell) cell.textContent = currentPlotsThisMinute;
+});
+
+elBtnRemove.addEventListener('click', () => {
+  if (currentPlotsThisMinute > 0) {
+    currentPlotsThisMinute--;
+    elCurrentPlots.textContent = currentPlotsThisMinute;
+    elBtnRemove.disabled = currentPlotsThisMinute <= 0;
+    const cell = document.getElementById(`cell-val-${currentMinute}`);
+    if (cell) cell.textContent = currentPlotsThisMinute;
+  }
+});
+
+// ── Initial render ──
+setArc(0, 'var(--green)');
+</script>
+</body>
+</html>
